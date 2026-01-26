@@ -8,15 +8,14 @@ return new class extends Migration {
     /**
      * Run the migrations.
      */
-    // database/migrations/xxxx_xx_xx_create_offices_table.php
     public function up(): void
     {
-        Schema::create('offices', function (Blueprint $table) {
+        Schema::create('bonuses', function (Blueprint $table) {
             $table->id();
-            $table->string('office_name');
-            $table->decimal('latitude', 10, 8); // Presisi tinggi untuk GPS
-            $table->decimal('longitude', 11, 8);
-            $table->integer('radius'); // Dalam meter
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->decimal('amount', 15, 2);
+            $table->date('date');
+            $table->string('description'); // Saya ubah jadi string agar bisa isi teks
             $table->timestamps();
         });
     }
@@ -25,6 +24,6 @@ return new class extends Migration {
      */
     public function down(): void
     {
-        Schema::dropIfExists('offices');
+        Schema::dropIfExists('bonuses');
     }
 };

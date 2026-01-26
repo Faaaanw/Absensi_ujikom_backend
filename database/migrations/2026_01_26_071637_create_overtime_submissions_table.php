@@ -8,23 +8,23 @@ return new class extends Migration {
     /**
      * Run the migrations.
      */
-    // database/migrations/xxxx_xx_xx_create_offices_table.php
     public function up(): void
     {
-        Schema::create('offices', function (Blueprint $table) {
+        Schema::create('overtime_submissions', function (Blueprint $table) {
             $table->id();
-            $table->string('office_name');
-            $table->decimal('latitude', 10, 8); // Presisi tinggi untuk GPS
-            $table->decimal('longitude', 11, 8);
-            $table->integer('radius'); // Dalam meter
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->date('date');
+            $table->integer('duration'); // Dalam jam
+            $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
             $table->timestamps();
         });
     }
+
     /**
      * Reverse the migrations.
      */
     public function down(): void
     {
-        Schema::dropIfExists('offices');
+        Schema::dropIfExists('overtime_submissions');
     }
 };
