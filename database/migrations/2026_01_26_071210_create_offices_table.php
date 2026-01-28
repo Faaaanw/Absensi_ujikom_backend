@@ -17,6 +17,9 @@ return new class extends Migration {
             $table->decimal('latitude', 10, 8); // Presisi tinggi untuk GPS
             $table->decimal('longitude', 11, 8);
             $table->integer('radius'); // Dalam meter
+
+            $table->time('start_time'); // Contoh: 08:00:00
+            $table->time('end_time');   // Contoh: 17:00:00
             $table->timestamps();
         });
     }

@@ -9,5 +9,5 @@ class Office extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['office_name', 'latitude', 'longitude', 'radius'];
+    protected $fillable = ['office_name', 'latitude', 'longitude', 'radius','start_time','end_time'];
 }
