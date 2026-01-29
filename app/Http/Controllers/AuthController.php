@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -25,20 +25,24 @@ class AuthController extends Controller
         $user = User::where('email', $request->email)->first();
 
         // 3. Cek Password (Hash)
-        if (! $user || ! Hash::check($request->password, $user->password)) {
+     
+        // 3. Cek Password & Cek Role
+        if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Email atau Password salah.',
             ], 401);
         }
-
-        // 4. Generate Token (Sanctum)
-        // 'auth_token' adalah nama tokennya, bisa diganti apa saja
+// Cek apakah user adalah employee
+        if ($user->role !== 'employee') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akun Anda tidak memiliki akses ke aplikasi ini.',
+            ], 403); // 403 Forbidden
+        }
+      
         $token = $user->createToken('auth_token')->plainTextToken;
-
-        // 5. Load Data Profil Karyawan (PENTING)
-        // Kita perlu data ini di Flutter (Nama, Jabatan, Kantor)
-        // Menggunakan 'load' untuk eager loading relasi
+        // 5. Load Relasi Profile, Position, dan Office
         $user->load(['profile.position', 'profile.office']);
 
         // 6. Return Response JSON
@@ -79,15 +83,15 @@ class AuthController extends Controller
             'message' => 'Logout berhasil'
         ]);
     }
-    
+
     /**
      * Get User Data (Untuk cek token valid/tidak)
      */
-    public function me(Request $request) 
+    public function me(Request $request)
     {
         $user = $request->user();
         $user->load(['profile.position', 'profile.office']);
-        
+
         return response()->json([
             'success' => true,
             'data' => $user
