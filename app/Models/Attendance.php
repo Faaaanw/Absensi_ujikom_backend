@@ -9,22 +9,25 @@ class Attendance extends Model
 {
     use HasFactory;
 
-    protected $table = 'attendances'; // (Opsional jika nama tabel sesuai standar)
-
-    // --- TAMBAHKAN BAGIAN INI ---
     protected $fillable = [
         'user_id',
+        'shift_id', // <--- TAMBAHKAN INI
         'date',
         'clock_in',
         'clock_out',
         'status',
-        'latitude', // <-- Tambahkan ini jika nanti Anda menyimpan lokasi juga
-        'longitude', //<-- Tambahkan ini jika nanti Anda menyimpan lokasi juga
+        'lat_in',      // Sesuaikan nama kolom di migration (lat_in / latitude)
+        'long_in',     // Sesuaikan nama kolom di migration
     ];
 
-    // Relasi ke User (biar bisa dipanggil $attendance->user)
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    // Relasi ke Shift (Untuk tahu hari itu dia shift apa)
+    public function shift()
+    {
+        return $this->belongsTo(Shift::class);
     }
 }

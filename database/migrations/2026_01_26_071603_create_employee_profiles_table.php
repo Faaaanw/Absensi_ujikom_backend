@@ -8,13 +8,18 @@ return new class extends Migration {
     /**
      * Run the migrations.
      */
+    // database/migrations/xxxx_xx_xx_create_employee_profiles_table.php
+// (REVISI DARI KODE KAMU)
     public function up(): void
     {
         Schema::create('employee_profiles', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('position_id')->constrained('positions'); // Relasi ke tabel positions
-            $table->foreignId('office_id')->constrained('offices'); // Relasi ke tabel offices
+            $table->foreignId('position_id')->constrained('positions');
+            $table->foreignId('office_id')->constrained('offices');
+
+            // TAMBAHAN: Relasi ke Shift
+            $table->foreignId('shift_id')->constrained('shifts');
 
             $table->string('nik', 20)->unique();
             $table->string('full_name');

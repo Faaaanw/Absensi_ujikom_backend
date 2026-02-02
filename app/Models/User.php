@@ -19,7 +19,7 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
-         'email',
+        'email',
         'password',
         'role',
     ];
@@ -54,6 +54,10 @@ class User extends Authenticatable
     public function attendances()
     {
         return $this->hasMany(Attendance::class);
+    }
+    public function overtimeSubmissions()
+    {
+        return $this->hasMany(OvertimeSubmission::class);
     }
 
     public function leaves()

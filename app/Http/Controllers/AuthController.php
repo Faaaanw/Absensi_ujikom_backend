@@ -6,46 +6,31 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    /**
-     * Handle Login Request
-     */
     public function login(Request $request)
     {
-        // 1. Validasi Input
         $request->validate([
             'email' => 'required|email',
             'password' => 'required',
         ]);
 
-        // 2. Cari User berdasarkan Email
         $user = User::where('email', $request->email)->first();
 
-        // 3. Cek Password (Hash)
-     
-        // 3. Cek Password & Cek Role
         if (!$user || !Hash::check($request->password, $user->password)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Email atau Password salah.',
-            ], 401);
+            return response()->json(['success' => false, 'message' => 'Email/Password salah.'], 401);
         }
-// Cek apakah user adalah employee
-        if ($user->role !== 'employee') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Akun Anda tidak memiliki akses ke aplikasi ini.',
-            ], 403); // 403 Forbidden
-        }
-      
-        $token = $user->createToken('auth_token')->plainTextToken;
-        // 5. Load Relasi Profile, Position, dan Office
-        $user->load(['profile.position', 'profile.office']);
 
-        // 6. Return Response JSON
+        if ($user->role !== 'employee') {
+            return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
+        }
+
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        // UBAH: Load 'profile.shift' juga
+        $user->load(['profile.position', 'profile.office', 'profile.shift']);
+
         return response()->json([
             'success' => true,
             'message' => 'Login berhasil',
@@ -55,20 +40,29 @@ class AuthController extends Controller
                     'id' => $user->id,
                     'email' => $user->email,
                     'role' => $user->role,
-                    // Mengambil data dari relasi profile
                     'name' => $user->profile ? $user->profile->full_name : 'No Profile',
                     'nik' => $user->profile ? $user->profile->nik : null,
                     'position' => $user->profile && $user->profile->position ? $user->profile->position->name : null,
+
+                    // DATA OFFICE (Lokasi)
                     'office' => $user->profile && $user->profile->office ? $user->profile->office->office_name : null,
                     'office_coords' => $user->profile && $user->profile->office ? [
                         'lat' => $user->profile->office->latitude,
                         'lng' => $user->profile->office->longitude,
                         'radius' => $user->profile->office->radius,
                     ] : null,
+
+                    // DATA SHIFT (Waktu) - TAMBAHAN
+                    'shift' => $user->profile && $user->profile->shift ? [
+                        'name' => $user->profile->shift->name,
+                        'start' => $user->profile->shift->start_time,
+                        'end' => $user->profile->shift->end_time,
+                    ] : null,
                 ]
             ]
         ], 200);
     }
+
 
     /**
      * Handle Logout Request
@@ -90,7 +84,7 @@ class AuthController extends Controller
     public function me(Request $request)
     {
         $user = $request->user();
-        $user->load(['profile.position', 'profile.office']);
+        $user->load(['profile.position', 'profile.office','profile.shift']);
 
         return response()->json([
             'success' => true,

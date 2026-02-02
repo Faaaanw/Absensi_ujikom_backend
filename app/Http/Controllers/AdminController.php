@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Office;
 use App\Models\Position;
+use App\Models\Shift; // <--- JANGAN LUPA IMPORT INI
 use DB;
 use Hash;
 use Illuminate\Http\Request;
@@ -12,10 +13,8 @@ use App\Models\Attendance;
 use App\Models\User;
 use Carbon\Carbon;
 
-
 class AdminController extends Controller
 {
-
     public function index()
     {
         $today = Carbon::today()->format('Y-m-d');
@@ -24,9 +23,11 @@ class AdminController extends Controller
             'total' => User::where('role', 'employee')->count(),
             'hadir' => Attendance::whereDate('date', $today)->where('status', 'hadir')->count(),
             'terlambat' => Attendance::whereDate('date', $today)->where('status', 'terlambat')->count(),
+            // Izin logic bisa disesuaikan nanti
             'izin' => Attendance::whereDate('date', $today)->where('status', 'izin')->count(),
         ];
 
+        // Eager load profile agar nama muncul
         $recentAttendances = Attendance::with('user.profile')
             ->whereDate('date', $today)
             ->orderBy('created_at', 'desc')
@@ -34,39 +35,26 @@ class AdminController extends Controller
 
         return view('admin.dashboard', compact('stats', 'recentAttendances'));
     }
-    // Kelola Kantor (Geofencing)
-    public function getOffices()
-    {
-        return response()->json(['data' => Office::all()]);
-    }
 
-    public function updateOffice(Request $request, $id)
-    {
-        $office = Office::findOrFail($id);
-        $office->update($request->all());
-        return response()->json(['message' => 'Lokasi kantor diperbarui']);
-    }
+    // --- BAGIAN KARYAWAN (EMPLOYEE) ---
 
-    // Kelola Jabatan (Gaji)
-    public function getPositions()
-    {
-        return response()->json(['data' => Position::all()]);
-    }
     public function employeeIndex()
     {
-        $employees = User::where('role', 'employee')->with('profile.office', 'profile.position')->get();
+        // Load juga relasi 'shift'
+        $employees = User::where('role', 'employee')
+            ->with('profile.office', 'profile.position', 'profile.shift')
+            ->get();
         return view('admin.employees.index', compact('employees'));
     }
 
-    // Menampilkan Form Tambah
     public function employeeCreate()
     {
         $offices = Office::all();
         $positions = Position::all();
-        return view('admin.employees.create', compact('offices', 'positions'));
+        $shifts = Shift::all(); // <--- Ambil data Shift
+        return view('admin.employees.create', compact('offices', 'positions', 'shifts'));
     }
 
-    // Menyimpan Karyawan Baru
     public function employeeStore(Request $request)
     {
         $request->validate([
@@ -76,6 +64,7 @@ class AdminController extends Controller
             'nik' => 'required|unique:employee_profiles,nik',
             'office_id' => 'required',
             'position_id' => 'required',
+            'shift_id' => 'required', // <--- Validasi Shift wajib dipilih
         ]);
 
         DB::transaction(function () use ($request) {
@@ -90,6 +79,7 @@ class AdminController extends Controller
                 'full_name' => $request->full_name,
                 'office_id' => $request->office_id,
                 'position_id' => $request->position_id,
+                'shift_id' => $request->shift_id, // <--- Simpan Shift ID
                 'phone' => $request->phone ?? '-',
                 'join_date' => $request->join_date ?? now(),
             ]);
@@ -98,15 +88,15 @@ class AdminController extends Controller
         return redirect()->route('admin.employees.index')->with('success', 'Karyawan berhasil ditambahkan');
     }
 
-    // Menghapus Karyawan
     public function employeeDestroy($id)
     {
         $user = User::findOrFail($id);
-        // Karena kita pakai cascadeOnDelete di migrasi, profile otomatis terhapus
         $user->delete();
-
         return redirect()->back()->with('success', 'Karyawan berhasil dihapus');
     }
+
+    // --- BAGIAN KANTOR (OFFICE) ---
+    // (Tidak ada perubahan signifikan di sini, kecuali jika Anda ingin menghapus start_time/end_time dari office karena sudah pindah ke Shift)
     public function officeIndex()
     {
         $offices = Office::all();
@@ -115,13 +105,12 @@ class AdminController extends Controller
 
     public function officeStore(Request $request)
     {
+        // Validasi disesuaikan (Start time & End time opsional jika pakai Shift, tapi biarkan saja jika ingin default)
         $request->validate([
             'office_name' => 'required',
             'latitude' => 'required|numeric',
             'longitude' => 'required|numeric',
             'radius' => 'required|numeric',
-            'start_time' => 'required',
-            'end_time' => 'required',
         ]);
 
         Office::create($request->all());
@@ -134,7 +123,7 @@ class AdminController extends Controller
         return redirect()->back()->with('success', 'Kantor dihapus');
     }
 
-    // === BAGIAN JABATAN (POSITION) ===
+    // --- BAGIAN JABATAN (POSITION) ---
     public function positionIndex()
     {
         $positions = Position::all();
@@ -157,5 +146,30 @@ class AdminController extends Controller
     {
         Position::findOrFail($id)->delete();
         return redirect()->back()->with('success', 'Jabatan dihapus');
+    }
+
+    // --- BAGIAN SHIFT (BARU) ---
+    public function shiftIndex()
+    {
+        $shifts = Shift::all();
+        return view('admin.shifts.index', compact('shifts'));
+    }
+
+    public function shiftStore(Request $request)
+    {
+        $request->validate([
+            'name' => 'required',
+            'start_time' => 'required',
+            'end_time' => 'required',
+        ]);
+
+        Shift::create($request->all());
+        return redirect()->back()->with('success', 'Shift berhasil ditambahkan');
+    }
+
+    public function shiftDestroy($id)
+    {
+        Shift::findOrFail($id)->delete();
+        return redirect()->back()->with('success', 'Shift dihapus');
     }
 }

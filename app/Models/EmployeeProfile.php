@@ -2,18 +2,22 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class EmployeeProfile extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'user_id',
-        'office_id',
         'position_id',
+        'office_id',
+        'shift_id', 
         'nik',
         'full_name',
         'phone',
-        'join_date' // Pastikan ini masuk list
+        'join_date',
     ];
 
     // Relasi ke User
@@ -22,15 +26,21 @@ class EmployeeProfile extends Model
         return $this->belongsTo(User::class);
     }
 
-    // Relasi ke Office (PENTING untuk Geofencing)
+    // Relasi ke Posisi
+    public function position()
+    {
+        return $this->belongsTo(Position::class);
+    }
+
+    // Relasi ke Kantor
     public function office()
     {
         return $this->belongsTo(Office::class);
     }
 
-    // Relasi ke Position (PENTING untuk Payroll)
-    public function position()
+    // Relasi ke Shift (Jadwal Default Karyawan)
+    public function shift()
     {
-        return $this->belongsTo(Position::class);
+        return $this->belongsTo(Shift::class);
     }
 }
