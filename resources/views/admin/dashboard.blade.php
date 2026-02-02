@@ -1,6 +1,19 @@
 @extends('layouts.app')
 
 @section('content')
+    <style>
+    /* CSS PERBAIKAN: Membalik Video Secara Horizontal */
+    #reader video {
+        /* Membalikkan gambar secara horizontal */
+        transform: scaleX(-1) !important; 
+        -webkit-transform: scaleX(-1) !important;
+        
+        /* Agar video tetap rapi */
+        width: 100% !important;
+        object-fit: cover;
+        border-radius: 8px; /* Opsional: pemanis sudut */
+    }
+</style>
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
         <h3 class="h3 mb-0 text-gray-800 fw-bold">Dashboard & Scanner</h3>
         <span class="small text-muted">{{ \Carbon\Carbon::now()->format('l, d F Y') }}</span>

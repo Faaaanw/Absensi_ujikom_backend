@@ -172,4 +172,79 @@ class AdminController extends Controller
         Shift::findOrFail($id)->delete();
         return redirect()->back()->with('success', 'Shift dihapus');
     }
+    public function leavesIndex()
+    {
+        // Ambil data izin, urutkan dari yang terbaru
+        $leaves = \App\Models\LeaveRequest::with('user.profile')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return view('admin.leaves.index', compact('leaves'));
+    }
+
+    public function leavesUpdate(Request $request, $id)
+    {
+        // Validasi input
+        $request->validate([
+            'status' => 'required|in:approved,rejected',
+            'rejection_reason' => 'required_if:status,rejected' // Wajib isi alasan jika ditolak
+        ]);
+
+        $leave = \App\Models\LeaveRequest::findOrFail($id);
+
+        // Update status
+        $leave->update([
+            'status' => $request->status,
+            'rejection_reason' => $request->rejection_reason
+        ]);
+
+        // LOGIKA KHUSUS: Jika disetujui, otomatis isi tabel Absensi (Attendance)
+        if ($request->status === 'approved') {
+            $period = \Carbon\CarbonPeriod::create($leave->start_date, $leave->end_date);
+
+            foreach ($period as $date) {
+                Attendance::updateOrCreate(
+                    [
+                        'user_id' => $leave->user_id,
+                        'date' => $date->format('Y-m-d'),
+                    ],
+                    [
+                        'status' => 'izin', // Set status harian jadi 'izin'
+                        'clock_in' => null,  // Tidak perlu jam masuk
+                        'clock_out' => null, // Tidak perlu jam pulang
+                    ]
+                );
+            }
+        }
+
+        return redirect()->back()->with('success', 'Status pengajuan izin berhasil diperbarui.');
+    }
+
+    // ==========================================
+    // BAGIAN PENGATURAN LEMBUR (OVERTIME)
+    // ==========================================
+
+    public function overtimeIndex()
+    {
+        $overtimes = \App\Models\OvertimeSubmission::with('user.profile')
+            ->orderBy('date', 'desc')
+            ->get();
+
+        return view('admin.overtime.index', compact('overtimes'));
+    }
+
+    public function overtimeUpdate(Request $request, $id)
+    {
+        $request->validate([
+            'status' => 'required|in:approved,rejected',
+        ]);
+
+        $overtime = \App\Models\OvertimeSubmission::findOrFail($id);
+
+        $overtime->update([
+            'status' => $request->status
+        ]);
+
+        return redirect()->back()->with('success', 'Status lembur berhasil diperbarui.');
+    }
 }

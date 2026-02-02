@@ -40,4 +40,11 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     Route::get('/positions', [AdminController::class, 'positionIndex'])->name('admin.positions.index');
     Route::post('/positions', [AdminController::class, 'positionStore'])->name('admin.positions.store');
     Route::delete('/positions/{id}', [AdminController::class, 'positionDestroy'])->name('admin.positions.destroy');
+
+    Route::get('/leaves', [AdminController::class, 'leavesIndex'])->name('admin.leaves.index');
+    Route::put('/leaves/{id}', [AdminController::class, 'leavesUpdate'])->name('admin.leaves.update');
+
+    // Route Lembur
+    Route::get('/overtime', [AdminController::class, 'overtimeIndex'])->name('overtime.index');
+    Route::put('/overtime/{id}', [AdminController::class, 'overtimeUpdate'])->name('overtime.update');
 });

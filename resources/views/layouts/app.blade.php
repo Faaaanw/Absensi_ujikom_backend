@@ -146,6 +146,14 @@
                     class="list-group-item list-group-item-action {{ request()->is('admin/shifts*') ? 'active' : '' }}">
                     <i class="fa-solid fa-clock me-2"></i> Shift
                 </a>
+                <a href="{{ route('admin.leaves.index') }}"
+                    class="list-group-item list-group-item-action {{ request()->is('admin/leaves*') ? 'active' : '' }}">
+                    <i class="fa-solid fa-file-circle-check me-2"></i> Izin/Cuti
+                </a>
+                <a href="{{ route('overtime.index') }}"
+                    class="list-group-item list-group-item-action {{ request()->is('admin/overtime*') ? 'active' : '' }}">
+                    <i class="fa-solid fa-clock-rotate-left me-2"></i> Lembur
+                </a>
 
                 <form action="{{ route('logout') }}" method="POST">
                     @csrf
