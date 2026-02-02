@@ -1,26 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Absensi</title>
-    
+
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+
     <style>
         :root {
             --sidebar-width: 260px;
             --primary-color: #4e73df;
-            --sidebar-bg: #111827; /* Dark Navy */
+            --sidebar-bg: #111827;
+            /* Dark Navy */
             --sidebar-hover: #1f2937;
             --text-muted: #9ca3af;
         }
 
         body {
             font-family: 'Nunito', sans-serif;
-            background-color: #f3f4f6; /* Light gray background */
+            background-color: #f3f4f6;
+            /* Light gray background */
             overflow-x: hidden;
         }
 
@@ -56,7 +59,8 @@
             border: none;
             padding: 12px 20px;
             margin-bottom: 5px;
-            border-radius: 8px; /* Rounded corners */
+            border-radius: 8px;
+            /* Rounded corners */
             font-weight: 600;
             transition: all 0.3s;
         }
@@ -97,45 +101,56 @@
             #sidebar-wrapper {
                 margin-left: 0;
             }
+
             #page-content-wrapper {
                 min-width: 0;
                 width: 100%;
             }
+
             body.sb-sidenav-toggled #sidebar-wrapper {
                 margin-left: calc(var(--sidebar-width) * -1);
             }
         }
     </style>
 </head>
+
 <body>
     <div class="d-flex" id="wrapper">
         <div id="sidebar-wrapper">
             <div class="sidebar-brand border-bottom border-secondary mb-3">
-                <i class="fa-solid fa-fingerprint me-2 text-primary"></i> 
+                <i class="fa-solid fa-fingerprint me-2 text-primary"></i>
                 <span>Absensi App</span>
             </div>
             <div class="list-group list-group-flush">
-                <a href="{{ route('admin.dashboard') }}" class="list-group-item list-group-item-action {{ request()->is('admin/dashboard') ? 'active' : '' }}">
+                <a href="{{ route('admin.dashboard') }}"
+                    class="list-group-item list-group-item-action {{ request()->is('admin/dashboard') ? 'active' : '' }}">
                     <i class="fa-solid fa-gauge me-2"></i> Dashboard
                 </a>
-                <a href="{{ route('admin.employees.index') }}" class="list-group-item list-group-item-action {{ request()->is('admin/employees*') ? 'active' : '' }}">
+                <a href="{{ route('admin.employees.index') }}"
+                    class="list-group-item list-group-item-action {{ request()->is('admin/employees*') ? 'active' : '' }}">
                     <i class="fa-solid fa-users me-2"></i> Data Karyawan
                 </a>
-                
-                <div class="text-secondary small fw-bold text-uppercase mt-3 mb-2 px-3" style="font-size: 0.75rem;">Master Data</div>
-                
-                <a href="{{ route('admin.offices.index') }}" class="list-group-item list-group-item-action {{ request()->is('admin/offices*') ? 'active' : '' }}">
+
+                <div class="text-secondary small fw-bold text-uppercase mt-3 mb-2 px-3" style="font-size: 0.75rem;">
+                    Master Data</div>
+
+                <a href="{{ route('admin.offices.index') }}"
+                    class="list-group-item list-group-item-action {{ request()->is('admin/offices*') ? 'active' : '' }}">
                     <i class="fa-solid fa-building me-2"></i> Kantor
                 </a>
-                <a href="{{ route('admin.positions.index') }}" class="list-group-item list-group-item-action {{ request()->is('admin/positions*') ? 'active' : '' }}">
+                <a href="{{ route('admin.positions.index') }}"
+                    class="list-group-item list-group-item-action {{ request()->is('admin/positions*') ? 'active' : '' }}">
                     <i class="fa-solid fa-id-card me-2"></i> Jabatan
                 </a>
+                <a href="{{ route('admin.shifts.index') }}"
+                    class="list-group-item list-group-item-action {{ request()->is('admin/shifts*') ? 'active' : '' }}">
+                    <i class="fa-solid fa-clock me-2"></i> Shift
+                </a>
 
-                <div class="mt-auto mb-4">
-                    <a href="#" class="list-group-item list-group-item-action text-danger mt-5">
-                        <i class="fa-solid fa-right-from-bracket me-2"></i> Logout
-                    </a>
-                </div>
+                <form action="{{ route('logout') }}" method="POST">
+                    @csrf
+                    <button type="submit" class="btn btn-danger">Logout</button>
+                </form>
             </div>
         </div>
         <div id="page-content-wrapper">
@@ -147,18 +162,24 @@
                 <div class="collapse navbar-collapse" id="navbarSupportedContent">
                     <ul class="navbar-nav ms-auto mt-2 mt-lg-0">
                         <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="navbarDropdown"
+                                role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                                 <div class="text-end me-2 d-none d-lg-block">
                                     <div class="small text-gray-600 fw-bold">Admin User</div>
                                     <div style="font-size: 10px;" class="text-muted">Administrator</div>
                                 </div>
-                                <img src="https://ui-avatars.com/api/?name=Admin+User&background=4e73df&color=fff" alt="Profile" class="rounded-circle" width="40" height="40">
+                                <img src="https://ui-avatars.com/api/?name=Admin+User&background=4e73df&color=fff"
+                                    alt="Profile" class="rounded-circle" width="40" height="40">
                             </a>
-                            <div class="dropdown-menu dropdown-menu-end shadow border-0 animate__animated animate__fadeIn" aria-labelledby="navbarDropdown">
-                                <a class="dropdown-item" href="#"><i class="fa-solid fa-user fa-sm fa-fw mr-2 text-gray-400"></i> Profile</a>
-                                <a class="dropdown-item" href="#"><i class="fa-solid fa-cogs fa-sm fa-fw mr-2 text-gray-400"></i> Settings</a>
+                            <div class="dropdown-menu dropdown-menu-end shadow border-0 animate__animated animate__fadeIn"
+                                aria-labelledby="navbarDropdown">
+                                <a class="dropdown-item" href="#"><i
+                                        class="fa-solid fa-user fa-sm fa-fw mr-2 text-gray-400"></i> Profile</a>
+                                <a class="dropdown-item" href="#"><i
+                                        class="fa-solid fa-cogs fa-sm fa-fw mr-2 text-gray-400"></i> Settings</a>
                                 <div class="dropdown-divider"></div>
-                                <a class="dropdown-item text-danger" href="#"><i class="fa-solid fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i> Logout</a>
+                                <a class="dropdown-item text-danger" href="#"><i
+                                        class="fa-solid fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i> Logout</a>
                             </div>
                         </li>
                     </ul>
@@ -168,7 +189,7 @@
             <div class="container-fluid p-4">
                 <div class="row mb-4">
                     <div class="col-12">
-                         @yield('content')
+                        @yield('content')
                     </div>
                 </div>
             </div>
@@ -188,4 +209,5 @@
         });
     </script>
 </body>
+
 </html>
