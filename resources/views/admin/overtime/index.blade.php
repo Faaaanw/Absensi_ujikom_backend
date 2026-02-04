@@ -39,7 +39,7 @@
                             </td>
                             <td class="px-4 text-end">
                                 @if($ot->status == 'pending')
-                                    <form action="{{ route('admin.overtime.update', $ot->id) }}" method="POST" class="d-inline">
+                                    <form action="{{ route('overtime.update', $ot->id) }}" method="POST" class="d-inline">
                                         @csrf @method('PUT')
                                         <input type="hidden" name="status" value="approved">
                                         <button class="btn btn-success btn-sm rounded-3" title="Setujui" onclick="return confirm('Setujui lembur ini?')">
@@ -47,7 +47,7 @@
                                         </button>
                                     </form>
 
-                                    <form action="{{ route('admin.overtime.update', $ot->id) }}" method="POST" class="d-inline">
+                                    <form action="{{ route('overtime.update', $ot->id) }}" method="POST" class="d-inline">
                                         @csrf @method('PUT')
                                         <input type="hidden" name="status" value="rejected">
                                         <button class="btn btn-danger btn-sm rounded-3 ms-1" title="Tolak" onclick="return confirm('Tolak lembur ini?')">

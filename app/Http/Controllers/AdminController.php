@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\AttendanceReportExport;
 use App\Http\Controllers\Controller;
 use App\Models\Office;
 use App\Models\Position;
@@ -12,6 +13,7 @@ use Illuminate\Http\Request;
 use App\Models\Attendance;
 use App\Models\User;
 use Carbon\Carbon;
+use Maatwebsite\Excel\Facades\Excel;
 
 class AdminController extends Controller
 {
@@ -57,17 +59,29 @@ class AdminController extends Controller
 
     public function employeeStore(Request $request)
     {
+        // 1. VALIDASI (Hapus validasi 'nik' karena sekarang otomatis)
         $request->validate([
             'full_name' => 'required',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|min:6',
-            'nik' => 'required|unique:employee_profiles,nik',
+            // 'nik' => 'required...', // BARIS INI DIHAPUS
             'office_id' => 'required',
             'position_id' => 'required',
-            'shift_id' => 'required', // <--- Validasi Shift wajib dipilih
+            'shift_id' => 'required',
         ]);
 
-        DB::transaction(function () use ($request) {
+        // 2. GENERATE NIK OTOMATIS
+        // Format: EMP + TahunBulanHari + 4 Angka Acak (Contoh: EMP202402038821)
+        $generatedNik = 'EMP' . date('Ymd') . rand(1000, 9999);
+
+        // Cek Database: Pastikan NIK ini belum dipakai orang lain (Looping sampai dapat yang unik)
+        while (\App\Models\EmployeeProfile::where('nik', $generatedNik)->exists()) {
+            $generatedNik = 'EMP' . date('Ymd') . rand(1000, 9999);
+        }
+
+        // 3. SIMPAN DATA
+        // Kita butuh 'use ($request, $generatedNik)' agar variabel bisa masuk ke dalam function transaction
+        DB::transaction(function () use ($request, $generatedNik) {
             $user = User::create([
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
@@ -75,23 +89,82 @@ class AdminController extends Controller
             ]);
 
             $user->profile()->create([
-                'nik' => $request->nik,
+                'nik' => $generatedNik, // <--- MASUKKAN NIK OTOMATIS DI SINI
                 'full_name' => $request->full_name,
                 'office_id' => $request->office_id,
                 'position_id' => $request->position_id,
-                'shift_id' => $request->shift_id, // <--- Simpan Shift ID
+                'shift_id' => $request->shift_id,
                 'phone' => $request->phone ?? '-',
                 'join_date' => $request->join_date ?? now(),
             ]);
         });
 
-        return redirect()->route('admin.employees.index')->with('success', 'Karyawan berhasil ditambahkan');
+        return redirect()->route('admin.employees.index')
+            ->with('success', 'Karyawan berhasil ditambahkan dengan NIK: ' . $generatedNik);
     }
 
-    public function employeeDestroy($id)
+    public function employeeEdit($id)
+    {
+        $user = User::with('profile')->findOrFail($id);
+        $offices = Office::all();
+        $positions = Position::all();
+        $shifts = Shift::all();
+
+        return view('admin.employees.edit', compact('user', 'offices', 'positions', 'shifts'));
+    }
+
+    // 2. PROSES UPDATE DATA
+    public function employeeUpdate(Request $request, $id)
     {
         $user = User::findOrFail($id);
+
+        $request->validate([
+            'full_name' => 'required',
+            // Validasi email unik kecuali untuk user ini sendiri
+            'email' => 'required|email|unique:users,email,' . $user->id,
+            // Password boleh kosong jika tidak ingin diganti
+            'password' => 'nullable|min:6',
+            'office_id' => 'required',
+            'position_id' => 'required',
+            'shift_id' => 'required',
+        ]);
+
+        DB::transaction(function () use ($request, $user) {
+            // Update User Login (Email & Password)
+            $userData = ['email' => $request->email];
+
+            // Jika password diisi, maka update password. Jika kosong, biarkan yang lama.
+            if ($request->filled('password')) {
+                $userData['password'] = Hash::make($request->password);
+            }
+
+            $user->update($userData);
+
+            // Update Profile Karyawan
+            // NIK TIDAK DIUPDATE (biasanya NIK itu permanen)
+            $user->profile()->update([
+                'full_name' => $request->full_name,
+                'office_id' => $request->office_id,
+                'position_id' => $request->position_id,
+                'shift_id' => $request->shift_id,
+                'phone' => $request->phone ?? $user->profile->phone,
+                'join_date' => $request->join_date ?? $user->profile->join_date,
+            ]);
+        });
+
+        return redirect()->route('admin.employees.index')->with('success', 'Data karyawan berhasil diperbarui');
+    }
+
+    // 3. PROSES HAPUS
+    public function employeeDestroy($id)
+    {
+        // Cari user
+        $user = User::findOrFail($id);
+
+        // Hapus user (Profile akan otomatis terhapus jika di migrasi pakai onDelete('cascade'))
+        // Jika tidak cascade, hapus manual: $user->profile()->delete();
         $user->delete();
+
         return redirect()->back()->with('success', 'Karyawan berhasil dihapus');
     }
 
@@ -117,10 +190,39 @@ class AdminController extends Controller
         return redirect()->back()->with('success', 'Kantor berhasil ditambahkan');
     }
 
+    public function officeUpdate(Request $request, $id)
+    {
+        $request->validate([
+            'office_name' => 'required',
+            'latitude' => 'required|numeric',
+            'longitude' => 'required|numeric',
+            'radius' => 'required|numeric',
+        ]);
+
+        $office = Office::findOrFail($id);
+
+        $office->update([
+            'office_name' => $request->office_name,
+            'latitude' => $request->latitude,
+            'longitude' => $request->longitude,
+            'radius' => $request->radius,
+        ]);
+
+        return redirect()->back()->with('success', 'Data kantor berhasil diperbarui');
+    }
+
+    // Method DESTROY (Hapus)
     public function officeDestroy($id)
     {
-        Office::findOrFail($id)->delete();
-        return redirect()->back()->with('success', 'Kantor dihapus');
+        $office = Office::findOrFail($id);
+
+        // Opsional: Cek apakah kantor masih dipakai oleh karyawan
+        // if($office->employees()->count() > 0) {
+        //    return redirect()->back()->with('error', 'Gagal hapus. Masih ada karyawan di kantor ini.');
+        // }
+
+        $office->delete();
+        return redirect()->back()->with('success', 'Kantor berhasil dihapus');
     }
 
     // --- BAGIAN JABATAN (POSITION) ---
@@ -246,5 +348,45 @@ class AdminController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Status lembur berhasil diperbarui.');
+    }
+    public function dailyReport(Request $request)
+    {
+        // 1. Ambil Filter dari Request (Default: Hari ini)
+        $startDate = $request->input('start_date', Carbon::today()->format('Y-m-d'));
+        $endDate = $request->input('end_date', Carbon::today()->format('Y-m-d'));
+        $officeId = $request->input('office_id');
+
+        // 2. CEK: Apakah User Klik Tombol "Export Excel"?
+        if ($request->input('action') == 'export') {
+            $fileName = 'Laporan_Absensi_' . $startDate . '_sd_' . $endDate . '.xlsx';
+
+            // Download Excel
+            return Excel::download(
+                new AttendanceReportExport($startDate, $endDate, $officeId),
+                $fileName
+            );
+        }
+
+        // 3. Jika Tidak Export, Tampilkan Data di Website (Filter Biasa)
+        $query = User::query();
+
+        // Filter user berdasarkan kantor (jika dipilih)
+        if ($officeId) {
+            $query->whereHas('profile', function ($q) use ($officeId) {
+                $q->where('office_id', $officeId);
+            });
+        }
+
+        $employees = $query->with([
+            'profile.office',
+            'profile.shift',
+            'attendances' => function ($q) use ($startDate, $endDate) {
+                $q->whereBetween('date', [$startDate, $endDate]);
+            }
+        ])->get();
+
+        $offices = Office::all(); // Sesuaikan nama model Office kamu
+
+        return view('admin.reports.daily', compact('employees', 'offices', 'startDate', 'endDate', 'officeId'));
     }
 }

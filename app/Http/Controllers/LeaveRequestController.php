@@ -58,8 +58,8 @@ class LeaveRequestController extends Controller
     public function myHistory()
     {
         $leaves = LeaveRequest::where('user_id', Auth::id())
-                    ->orderBy('created_at', 'desc')
-                    ->get();
+            ->orderBy('created_at', 'desc')
+            ->get();
 
         return response()->json([
             'success' => true,
@@ -70,7 +70,7 @@ class LeaveRequestController extends Controller
     /**
      * Update Status Izin (Sisi Admin - Dashboard)
      */
-   public function allHistory()
+    public function allHistory()
     {
         if (Auth::user()->role !== 'admin') {
             return response()->json(['message' => 'Unauthorized'], 403);
@@ -88,6 +88,8 @@ class LeaveRequestController extends Controller
      * Sisi Admin: Approve/Reject
      * Sesuai rute: /admin/leave/{id}/status
      */
+    // File: App\Http\Controllers\LeaveRequestController.php
+
     public function approve(Request $request, $id)
     {
         if (Auth::user()->role !== 'admin') {
@@ -105,22 +107,35 @@ class LeaveRequestController extends Controller
             'rejection_reason' => $request->rejection_reason
         ]);
 
-        // LOGIKA PENTING: Jika Approved, otomatis isi tabel Attendance
+        // LOGIKA PERBAIKAN: Jangan timpa jam masuk jika sudah ada
         if ($request->status === 'approved') {
             $period = CarbonPeriod::create($leave->start_date, $leave->end_date);
 
             foreach ($period as $date) {
-                Attendance::updateOrCreate(
-                    [
+                // Cek apakah data absensi hari itu sudah ada?
+                $attendance = Attendance::where('user_id', $leave->user_id)
+                    ->where('date', $date->format('Y-m-d'))
+                    ->first();
+
+                if ($attendance) {
+                    // Jika sudah ada (misal dia masuk setengah hari lalu izin),
+                    // Kita update statusnya saja jika belum clock_in, 
+                    // TAPI jika sudah clock_in, biarkan statusnya mengikuti logika kehadiran atau ubah manual.
+
+                    // Opsi aman: Hanya update jika belum ada jam masuk
+                    if (!$attendance->clock_in) {
+                        $attendance->update(['status' => 'izin']);
+                    }
+                } else {
+                    // Jika belum ada record sama sekali, buat baru sebagai izin
+                    Attendance::create([
                         'user_id' => $leave->user_id,
-                        'date'    => $date->format('Y-m-d'),
-                    ],
-                    [
-                        'status'  => 'izin', // Menandai hari ini sebagai izin (bukan Alpha)
+                        'date' => $date->format('Y-m-d'),
+                        'status' => 'izin',
                         'clock_in' => null,
                         'clock_out' => null,
-                    ]
-                );
+                    ]);
+                }
             }
         }
 

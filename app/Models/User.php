@@ -55,7 +55,7 @@ class User extends Authenticatable
     {
         return $this->hasMany(Attendance::class);
     }
-    public function overtimeSubmissions()
+    public function overtimes()
     {
         return $this->hasMany(OvertimeSubmission::class);
     }

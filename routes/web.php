@@ -24,6 +24,8 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     Route::get('/employees', [AdminController::class, 'employeeIndex'])->name('admin.employees.index');
     Route::get('/employees/create', [AdminController::class, 'employeeCreate'])->name('admin.employees.create');
     Route::post('/employees/store', [AdminController::class, 'employeeStore'])->name('admin.employees.store');
+    Route::get('/employees/{id}/edit', [AdminController::class, 'employeeEdit'])->name('admin.employees.edit');
+    Route::put('/employees/{id}', [AdminController::class, 'employeeUpdate'])->name('admin.employees.update');
     Route::delete('/employees/{id}', [AdminController::class, 'employeeDestroy'])->name('admin.employees.destroy');
 
     Route::get('/shifts', [AdminController::class, 'shiftIndex'])->name('admin.shifts.index');
@@ -34,6 +36,7 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     // Kantor
     Route::get('/offices', [AdminController::class, 'officeIndex'])->name('admin.offices.index');
     Route::post('/offices', [AdminController::class, 'officeStore'])->name('admin.offices.store');
+    Route::put('/offices/{id}', [AdminController::class, 'officeUpdate'])->name('admin.offices.update');
     Route::delete('/offices/{id}', [AdminController::class, 'officeDestroy'])->name('admin.offices.destroy');
 
     // Jabatan
@@ -47,4 +50,7 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     // Route Lembur
     Route::get('/overtime', [AdminController::class, 'overtimeIndex'])->name('overtime.index');
     Route::put('/overtime/{id}', [AdminController::class, 'overtimeUpdate'])->name('overtime.update');
+
+    // Di dalam group middleware auth & prefix admin
+    Route::get('/daily-report', [AdminController::class, 'dailyReport'])->name('admin.reports.daily');
 });

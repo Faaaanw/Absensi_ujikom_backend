@@ -42,8 +42,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/leave/history', [LeaveRequestController::class, 'myHistory']);
 
     // --- OVERTIME (LEMBUR) [BARU DITAMBAHKAN] ---
-    Route::post('/overtime', [OvertimeSubmissionController::class, 'store']);       // Ajukan lembur
-    Route::get('/overtime/history', [OvertimeSubmissionController::class, 'myHistory']); // History saya
+    Route::post('/overtime', [App\Http\Controllers\OvertimeSubmissionController::class, 'store']);
+    Route::get('/overtime/my-history', [App\Http\Controllers\OvertimeSubmissionController::class, 'myHistory']);
 
     // ====================================================================
     // ADMIN ROUTES (Sebaiknya nanti ditambahkan middleware 'role:admin')

@@ -33,7 +33,7 @@ class AttendanceController extends Controller
         }
 
         $office = $user->profile->office;
-        $shift  = $user->profile->shift; // Ambil data shift
+        $shift = $user->profile->shift; // Ambil data shift
 
         // 1. VALIDASI GEOFENCING (Tetap pakai data Office)
         $distance = $this->calculateDistance(
@@ -54,9 +54,9 @@ class AttendanceController extends Controller
         // 2. VALIDASI WAKTU (Sekarang pakai data SHIFT)
         $today = Carbon::today();
         $now = Carbon::now();
-        
+
         // UBAH: Ambil jam pulang dari Shift
-        $jamPulang = Carbon::parse($shift->end_time); 
+        $jamPulang = Carbon::parse($shift->end_time);
 
         // Logika sederhana untuk Shift Malam (Lintas hari)
         // Jika start_time > end_time (misal 20:00 - 05:00), penanganan butuh logika tambahan.
@@ -67,8 +67,16 @@ class AttendanceController extends Controller
             ->first();
 
         if ($existingAttendance) {
+            // [BARU] Cek status. Jika status BUKAN hadir/terlambat (misal: izin), tolak scan.
+            if (!in_array($existingAttendance->status, ['hadir', 'terlambat'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Anda berstatus ' . strtoupper($existingAttendance->status) . ' hari ini. Tidak perlu scan.',
+                ], 400);
+            }
+            // [AKHIR BARU]
+
             // --- SUDAH ABSEN MASUK (MAU PULANG) ---
-            
             if ($existingAttendance->clock_out) {
                 return response()->json([
                     'success' => false,
@@ -83,7 +91,7 @@ class AttendanceController extends Controller
                     'message' => 'Belum waktunya pulang. Jadwal pulang: ' . $jamPulang->format('H:i'),
                 ], 400);
             }
-            
+
         } else {
             // --- BELUM ABSEN MASUK (MAU MASUK) ---
 
@@ -123,10 +131,10 @@ class AttendanceController extends Controller
 
         // UBAH: Load office DAN shift
         $user = User::with(['profile.office', 'profile.shift'])->find($userId);
-        
+
         $office = $user->profile->office;
-        $shift  = $user->profile->shift; // Variable shift
-        
+        $shift = $user->profile->shift; // Variable shift
+
         $today = Carbon::today();
         $waktuSekarang = Carbon::now();
 
@@ -136,6 +144,16 @@ class AttendanceController extends Controller
 
         // --- PROSES CLOCK OUT ---
         if ($existingAttendance) {
+
+            // [BARU] Cek status sebelum update clock_out
+            if (!in_array($existingAttendance->status, ['hadir', 'terlambat'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Gagal scan. Status Anda hari ini: ' . ucfirst($existingAttendance->status)
+                ], 400);
+            }
+            // [AKHIR BARU]
+
             if ($existingAttendance->clock_out) {
                 return response()->json(['message' => 'Sudah Clock Out sebelumnya.'], 400);
             }
@@ -152,10 +170,10 @@ class AttendanceController extends Controller
         }
 
         // --- PROSES CLOCK IN ---
-        
+
         // 1. Ambil jam masuk dari SHIFT
-        $jamMasuk = Carbon::parse($shift->start_time); 
-        
+        $jamMasuk = Carbon::parse($shift->start_time);
+
         // 2. Toleransi 30 menit
         $batasTerlambat = $jamMasuk->copy()->addMinutes(30);
 

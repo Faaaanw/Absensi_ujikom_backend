@@ -1,25 +1,27 @@
 @extends('layouts.app')
 
 @section('content')
+    {{-- 1. Tambahkan CDN SweetAlert2 --}}
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <style>
-    /* CSS PERBAIKAN: Membalik Video Secara Horizontal */
-    #reader video {
-        /* Membalikkan gambar secara horizontal */
-        transform: scaleX(-1) !important; 
-        -webkit-transform: scaleX(-1) !important;
-        
-        /* Agar video tetap rapi */
-        width: 100% !important;
-        object-fit: cover;
-        border-radius: 8px; /* Opsional: pemanis sudut */
-    }
-</style>
+        /* CSS PERBAIKAN: Membalik Video Secara Horizontal */
+        #reader video {
+            transform: scaleX(-1) !important;
+            -webkit-transform: scaleX(-1) !important;
+            width: 100% !important;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+    </style>
+
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
         <h3 class="h3 mb-0 text-gray-800 fw-bold">Dashboard & Scanner</h3>
         <span class="small text-muted">{{ \Carbon\Carbon::now()->format('l, d F Y') }}</span>
     </div>
 
     <div class="row">
+        {{-- KOLOM KIRI (STATISTIK) --}}
         <div class="col-lg-8 mb-4">
             <div class="row mb-4">
                 <div class="col-md-4 mb-3 mb-md-0">
@@ -101,12 +103,14 @@
                                             </div>
                                         </td>
                                         <td class="text-muted small">
-                                            {{-- PERBAIKAN 1: Format Jam menjadi lebih rapi (H:i) --}}
-                                            <i class="far fa-clock me-1"></i>
-                                            {{ \Carbon\Carbon::parse($row->clock_in)->format('H:i') }} WIB
+                                            @if($row->clock_in)
+                                                <i class="far fa-clock me-1"></i>
+                                                {{ \Carbon\Carbon::parse($row->clock_in)->format('H:i') }} WIB
+                                            @else
+                                                <span class="text-secondary">-</span>
+                                            @endif
                                         </td>
                                         <td class="px-4 text-end">
-                                            {{-- PERBAIKAN 2: Logika Status yang lebih ketat --}}
                                             @if($row->status == 'terlambat')
                                                 <span
                                                     class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 rounded-pill px-3">
@@ -118,8 +122,16 @@
                                                     HADIR
                                                 </span>
                                             @else
-                                                {{-- Handle status lain jika ada (misal: Izin/Sakit) --}}
-                                                <span class="badge bg-secondary rounded-pill px-3">
+                                                @php
+                                                    $badgeClass = match ($row->status) {
+                                                        'sakit' => 'bg-warning text-warning',
+                                                        'izin' => 'bg-info text-info',
+                                                        'cuti' => 'bg-primary text-primary',
+                                                        default => 'bg-secondary text-secondary'
+                                                    };
+                                                @endphp
+                                                <span
+                                                    class="badge {{ $badgeClass }} bg-opacity-10 border border-opacity-25 rounded-pill px-3">
                                                     {{ strtoupper($row->status) }}
                                                 </span>
                                             @endif
@@ -138,10 +150,8 @@
             </div>
         </div>
 
-        {{-- Kolom Kanan (Scanner) tetap sama HTML-nya, kita ubah Script di bawah --}}
+        {{-- KOLOM KANAN (SCANNER) --}}
         <div class="col-lg-4">
-            {{-- ... Kode Card Scanner HTML tetap sama ... --}}
-
             <div class="card border-0 shadow-sm rounded-4 text-center overflow-hidden">
                 <div class="card-header bg-dark text-white py-3">
                     <h6 class="m-0 fw-bold"><i class="fa-solid fa-qrcode me-2"></i>Scanner Absensi</h6>
@@ -215,7 +225,7 @@
                 onScanFailure
             ).catch(err => {
                 console.error("Gagal memulai kamera", err);
-                alert("Gagal mengakses kamera: " + err);
+                Swal.fire({ icon: 'error', title: 'Error', text: 'Gagal mengakses kamera: ' + err });
                 stopScanner();
             });
         }
@@ -250,8 +260,6 @@
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
-                    // Pastikan CSRF Token ada jika menggunakan Web routes, 
-                    // jika API routes (stateless) biasanya tidak perlu, tapi jika session based perlu:
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
                 },
                 body: JSON.stringify({ token: decodedText })
@@ -259,33 +267,56 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        // PERBAIKAN 3: Menampilkan Jam Realtime dari Server
-                        // Kita ambil jam dari response data (data.data.clock_in atau clock_out)
-
-                        let timeString = "";
-                        let statusString = "";
+                        let timeString = "-";
+                        let statusString = "BERHASIL";
 
                         if (data.data) {
-                            // Ambil waktu Clock In atau Clock Out tergantung response
                             let rawTime = data.data.clock_out ? data.data.clock_out : data.data.clock_in;
-                            // Format waktu sederhana (ambil 5 karakter awal HH:mm)
                             timeString = rawTime ? rawTime.substring(0, 5) : '-';
                             statusString = data.data.status ? data.data.status.toUpperCase() : 'BERHASIL';
                         }
 
-                        // Alert dengan detail waktu
-                        alert(`✅ ${data.message}\n🕒 Waktu: ${timeString} WIB\n📊 Status: ${statusString}`);
+                        // --- MODIFIKASI SWEETALERT SUKSES ---
+                        Swal.fire({
+                            title: 'Scan Berhasil!',
+                            html: `<div class="text-center">
+                                         <h4 class="text-success fw-bold">${statusString}</h4>
+                                         <p class="mb-0 text-muted">${data.message}</p>
+                                         <p class="fs-4 fw-bold mt-2">🕒 ${timeString} WIB</p>
+                                       </div>`,
+                            icon: 'success',
+                            timer: 2750, // Durasi 1.5 detik agar sempat terbaca
+                            timerProgressBar: true,
+                            showConfirmButton: false
+                        }).then(() => {
+                            // Reload halaman setelah alert tertutup
+                            location.reload();
+                        });
 
-                        location.reload();
                     } else {
-                        alert("❌ GAGAL: " + data.message);
-                        html5QrCode.resume();
-                        resultElement.innerText = "Silakan coba lagi.";
+                        // --- MODIFIKASI SWEETALERT GAGAL ---
+                        Swal.fire({
+                            title: 'Gagal!',
+                            text: data.message,
+                            icon: 'error',
+                            timer: 2000, // Error sedikit lebih lama agar terbaca
+                            showConfirmButton: false
+                        }).then(() => {
+                            // Resume kamera agar bisa scan ulang
+                            html5QrCode.resume();
+                            resultElement.innerText = "Silakan coba scan lagi.";
+                        });
                     }
                 })
                 .catch(err => {
-                    alert("Error Sistem: " + err);
-                    html5QrCode.resume();
+                    Swal.fire({
+                        title: 'Error Sistem',
+                        text: err,
+                        icon: 'warning',
+                        confirmButtonText: 'OK'
+                    }).then(() => {
+                        html5QrCode.resume();
+                    });
                 });
         }
 

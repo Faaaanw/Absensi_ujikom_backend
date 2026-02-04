@@ -40,12 +40,7 @@
                                         value="{{ old('full_name') }}" required placeholder="Masukkan nama sesuai KTP">
                                     @error('full_name') <div class="invalid-feedback">{{ $message }}</div> @enderror
                                 </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">NIK (Nomor Induk Karyawan)</label>
-                                    <input type="text" name="nik" class="form-control @error('nik') is-invalid @enderror"
-                                        value="{{ old('nik') }}" required placeholder="Contoh: EMP2024001">
-                                    @error('nik') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                                </div>
+                                
                             </div>
 
                             <div class="row">

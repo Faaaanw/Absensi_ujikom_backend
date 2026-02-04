@@ -27,7 +27,6 @@
                         <tr>
                             <th class="px-4 py-3 small fw-bold text-uppercase">Nama Kantor</th>
                             <th class="py-3 small fw-bold text-uppercase">Lokasi</th>
-                            {{-- Kolom Jadwal DIHAPUS --}}
                             <th class="px-4 py-3 small fw-bold text-uppercase text-end">Aksi</th>
                         </tr>
                     </thead>
@@ -44,21 +43,87 @@
                                         <div>
                                             <div class="small text-dark">{{ $office->latitude }}, {{ $office->longitude }}</div>
                                             <div class="small text-muted" style="font-size: 0.75rem;">Radius:
-                                                {{ $office->radius }}m</div>
+                                                {{ $office->radius }}m
+                                            </div>
                                         </div>
                                     </div>
                                 </td>
-                                {{-- Data Jadwal DIHAPUS --}}
                                 <td class="px-4 text-end">
-                                    <form action="{{ route('admin.offices.destroy', $office->id) }}" method="POST"
-                                        onsubmit="return confirm('Yakin ingin menghapus kantor ini?');">
-                                        @csrf @method('DELETE')
-                                        <button class="btn btn-outline-danger btn-sm rounded-3" title="Hapus">
-                                            <i class="fa-solid fa-trash-can"></i>
+                                    <div class="d-flex justify-content-end gap-2">
+                                        {{-- TOMBOL EDIT (Trigger Modal) --}}
+                                        <button type="button" class="btn btn-outline-warning btn-sm rounded-3"
+                                            data-bs-toggle="modal" data-bs-target="#editOfficeModal-{{ $office->id }}"
+                                            title="Edit">
+                                            <i class="fa-solid fa-pen-to-square"></i>
                                         </button>
-                                    </form>
+
+                                        {{-- TOMBOL HAPUS --}}
+                                        <form action="{{ route('admin.offices.destroy', $office->id) }}" method="POST"
+                                            onsubmit="return confirm('Yakin ingin menghapus kantor ini?');">
+                                            @csrf @method('DELETE')
+                                            <button class="btn btn-outline-danger btn-sm rounded-3" title="Hapus">
+                                                <i class="fa-solid fa-trash-can"></i>
+                                            </button>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
+
+                            {{-- MODAL EDIT (Disimpan di dalam loop agar setiap data punya modal sendiri) --}}
+                            <div class="modal fade" id="editOfficeModal-{{ $office->id }}" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content rounded-4 border-0">
+                                        <div class="modal-header border-bottom-0">
+                                            <h5 class="modal-title fw-bold text-warning">Edit Kantor</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                aria-label="Close"></button>
+                                        </div>
+                                        <form action="{{ route('admin.offices.update', $office->id) }}" method="POST">
+                                            @csrf
+                                            @method('PUT') {{-- PENTING: Method PUT untuk Update --}}
+
+                                            <div class="modal-body">
+                                                <div class="mb-3">
+                                                    <label class="form-label small text-muted fw-bold">NAMA KANTOR</label>
+                                                    <input type="text" name="office_name" class="form-control"
+                                                        value="{{ $office->office_name }}" required>
+                                                </div>
+
+                                                <div class="row">
+                                                    <div class="col-6 mb-3">
+                                                        <label class="form-label small text-muted fw-bold">LATITUDE</label>
+                                                        <input type="text" name="latitude" class="form-control"
+                                                            value="{{ $office->latitude }}" required>
+                                                    </div>
+                                                    <div class="col-6 mb-3">
+                                                        <label class="form-label small text-muted fw-bold">LONGITUDE</label>
+                                                        <input type="text" name="longitude" class="form-control"
+                                                            value="{{ $office->longitude }}" required>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mb-3">
+                                                    <label class="form-label small text-muted fw-bold">RADIUS (METER)</label>
+                                                    <div class="input-group">
+                                                        <span class="input-group-text bg-light"><i
+                                                                class="fa-solid fa-circle-notch"></i></span>
+                                                        <input type="number" name="radius" class="form-control"
+                                                            value="{{ $office->radius }}" required>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer border-top-0">
+                                                <button type="button" class="btn btn-light rounded-3"
+                                                    data-bs-dismiss="modal">Batal</button>
+                                                <button type="submit"
+                                                    class="btn btn-warning text-white rounded-3 px-4">Update</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            {{-- END MODAL EDIT --}}
+
                         @empty
                             <tr>
                                 <td colspan="3" class="text-center py-5 text-muted">
@@ -73,6 +138,7 @@
         </div>
     </div>
 
+    {{-- MODAL CREATE (Tetap Sama) --}}
     <div class="modal fade" id="createOfficeModal" tabindex="-1" aria-labelledby="createOfficeLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content rounded-4 border-0">
@@ -107,9 +173,6 @@
                                 <input type="number" name="radius" class="form-control" value="50" required>
                             </div>
                         </div>
-                        
-                        {{-- Input Jam Masuk & Pulang SUDAH DIHAPUS --}}
-
                     </div>
                     <div class="modal-footer border-top-0">
                         <button type="button" class="btn btn-light rounded-3" data-bs-dismiss="modal">Batal</button>

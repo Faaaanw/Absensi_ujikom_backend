@@ -130,6 +130,10 @@
                     class="list-group-item list-group-item-action {{ request()->is('admin/employees*') ? 'active' : '' }}">
                     <i class="fa-solid fa-users me-2"></i> Data Karyawan
                 </a>
+                <a href="{{ route('admin.reports.daily') }}"
+                    class="list-group-item list-group-item-action {{ request()->is('admin/daily-report*') ? 'active' : '' }}">
+                    <i class="fa-solid fa-file-lines me-2"></i> Laporan Harian
+                </a>
 
                 <div class="text-secondary small fw-bold text-uppercase mt-3 mb-2 px-3" style="font-size: 0.75rem;">
                     Master Data</div>

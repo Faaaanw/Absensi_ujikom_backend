@@ -6,6 +6,10 @@
         <a href="{{ route('admin.employees.create') }}" class="btn btn-primary">+ Tambah Karyawan</a>
     </div>
 
+    @if(session('success'))
+        <div class="alert alert-success">{{ session('success') }}</div>
+    @endif
+
     <div class="card">
         <div class="card-body p-0">
             <table class="table table-hover mb-0">
@@ -26,18 +30,28 @@
                             <td>{{ $emp->profile->nik }}</td>
                             <td>{{ $emp->profile->office->office_name }}</td>
                             <td>{{ $emp->profile->position->name }}</td>
-
                             <td>
-                                <span class="badge bg-info text-dark">
-                                    {{ $emp->profile->shift->name ?? '-' }}
-                                </span>
+                                <span class="badge bg-info text-dark">{{ $emp->profile->shift->name ?? '-' }}</span>
                                 <br>
                                 <small class="text-muted">
                                     {{ $emp->profile->shift->start_time ?? '' }} - {{ $emp->profile->shift->end_time ?? '' }}
                                 </small>
                             </td>
-
                             <td>
+                                <div class="d-flex gap-2">
+                                    {{-- TOMBOL EDIT --}}
+                                    <a href="{{ route('admin.employees.edit', $emp->id) }}" class="btn btn-sm btn-warning">
+                                        Edit
+                                    </a>
+
+                                    {{-- TOMBOL DELETE (Harus pakai Form) --}}
+                                    <form action="{{ route('admin.employees.destroy', $emp->id) }}" method="POST"
+                                        onsubmit="return confirm('Yakin ingin menghapus karyawan ini? Data yang dihapus tidak bisa dikembalikan.');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-sm btn-danger">Hapus</button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                     @endforeach
