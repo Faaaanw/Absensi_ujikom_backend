@@ -8,14 +8,6 @@ use App\Http\Controllers\LeaveRequestController;
 use App\Http\Controllers\OvertimeSubmissionController; // <--- Import Controller Lembur
 use App\Http\Controllers\ReportController;
 
-/*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-*/
-
-// ========================================================================
-// 1. PUBLIC ROUTES (Tidak butuh Token Login)
 // ========================================================================
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -44,13 +36,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // --- OVERTIME (LEMBUR) [BARU DITAMBAHKAN] ---
     Route::post('/overtime', [App\Http\Controllers\OvertimeSubmissionController::class, 'store']);
     Route::get('/overtime/my-history', [App\Http\Controllers\OvertimeSubmissionController::class, 'myHistory']);
-
-    // ====================================================================
-    // ADMIN ROUTES (Sebaiknya nanti ditambahkan middleware 'role:admin')
-    // ====================================================================
-
     // --- MASTER DATA SHIFT ---
     Route::apiResource('shifts', ShiftController::class);
+    Route::get('/home-data', [AttendanceController::class, 'getHomeData']);
 
     // --- ADMIN APPROVAL CUTI ---
     Route::get('/admin/leaves', [LeaveRequestController::class, 'allHistory']);

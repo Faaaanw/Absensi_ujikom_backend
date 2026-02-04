@@ -213,4 +213,75 @@ class AttendanceController extends Controller
         $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
         return $earthRadius * $c;
     }
+    public function getHomeData(Request $request)
+    {
+        $user = Auth::user();
+        $today = Carbon::today()->format('Y-m-d');
+
+        // 1. Ambil Data Profil (Kantor & Shift)
+        $user->load(['profile.office', 'profile.shift', 'profile.position']);
+
+        // 2. Cek Absensi Hari Ini
+        $attendance = Attendance::where('user_id', $user->id)
+            ->whereDate('date', $today)
+            ->first();
+
+        // 3. Cek Apakah Ada Izin/Sakit yang DISETUJUI hari ini
+        // Asumsi nama model LeaveRequest
+        $leave = \App\Models\LeaveRequest::where('user_id', $user->id)
+            ->where('status', 'approved')
+            ->whereDate('start_date', '<=', $today)
+            ->whereDate('end_date', '>=', $today)
+            ->first();
+
+        // 4. Cek Apakah Ada Lembur yang DISETUJUI hari ini
+        $overtime = \App\Models\OvertimeSubmission::where('user_id', $user->id)
+            ->whereDate('date', $today)
+            ->where('status', 'approved')
+            ->first();
+
+        // 5. Tentukan Status Utama untuk UI
+        // Prioritas: Izin > Lembur > Absen Biasa
+        $todayStatus = 'regular'; // default
+        $statusLabel = 'Shift Normal';
+        $statusColor = 'blue'; // blue, red, orange, green
+
+        if ($leave) {
+            $todayStatus = 'leave';
+            $statusLabel = 'Sedang Izin / Sakit';
+            $statusColor = 'red';
+        } elseif ($overtime) {
+            $todayStatus = 'overtime';
+            $statusLabel = 'Jadwal Lembur';
+            $statusColor = 'orange';
+        } elseif ($attendance) {
+            $todayStatus = 'present';
+            $statusLabel = 'Sudah Absen Masuk';
+            $statusColor = 'green';
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                // Info User
+                'name' => $user->profile->full_name,
+                'position' => $user->profile->position->name ?? '-',
+                'office' => $user->profile->office->office_name ?? '-',
+
+                // Info Shift
+                'shift_name' => $user->profile->shift->name ?? '-',
+                'shift_start' => $user->profile->shift->start_time ?? '00:00',
+                'shift_end' => $user->profile->shift->end_time ?? '00:00',
+
+                // Status Hari Ini
+                'today_status' => $todayStatus, // regular, leave, overtime, present
+                'status_label' => $statusLabel,
+                'status_color' => $statusColor,
+
+                // Detail Absensi (jika sudah absen)
+                'clock_in' => $attendance ? $attendance->clock_in : '-',
+                'clock_out' => $attendance ? $attendance->clock_out : '-',
+            ]
+        ]);
+    }
 }
