@@ -70,25 +70,26 @@ class LeaveRequestController extends Controller
     /**
      * Update Status Izin (Sisi Admin - Dashboard)
      */
-    public function allHistory()
-    {
-        if (Auth::user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        $leaves = LeaveRequest::with('user.profile')->orderBy('created_at', 'desc')->get();
-
-        return response()->json([
-            'success' => true,
-            'data' => $leaves
-        ]);
+    public function allHistory(Request $request)
+{
+    if (Auth::user()->role !== 'admin') {
+        return redirect()->back();
     }
 
-    /**
-     * Sisi Admin: Approve/Reject
-     * Sesuai rute: /admin/leave/{id}/status
-     */
-    // File: App\Http\Controllers\LeaveRequestController.php
+    $query = LeaveRequest::with('user.profile');
+
+    // --- LOGIKA FILTER TANGGAL ---
+    if ($request->filled('start_date') && $request->filled('end_date')) {
+        // Memfilter data dimana tanggal mulai izin berada dalam rentang yang dipilih
+        $query->whereBetween('start_date', [$request->start_date, $request->end_date]);
+    }
+    // -----------------------------
+
+    $leaves = $query->orderBy('created_at', 'desc')->get();
+
+    // Pastikan return ke view
+    return view('admin.leaves.index', compact('leaves'));
+}
 
     public function approve(Request $request, $id)
     {
@@ -145,4 +146,5 @@ class LeaveRequestController extends Controller
             'data' => $leave
         ]);
     }
+    
 }

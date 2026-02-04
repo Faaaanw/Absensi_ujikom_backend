@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminAuthController; // Import Controller Login Baru
+use App\Http\Controllers\LeaveRequestController;
+use App\Http\Controllers\OvertimeSubmissionController;
 use Illuminate\Support\Facades\Route;
 
 // --- 1. HALAMAN LOGIN (Public) ---
@@ -42,13 +44,14 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     // Jabatan
     Route::get('/positions', [AdminController::class, 'positionIndex'])->name('admin.positions.index');
     Route::post('/positions', [AdminController::class, 'positionStore'])->name('admin.positions.store');
+    Route::put('/positions/{id}', [AdminController::class, 'positionUpdate'])->name('admin.positions.update');
     Route::delete('/positions/{id}', [AdminController::class, 'positionDestroy'])->name('admin.positions.destroy');
 
-    Route::get('/leaves', [AdminController::class, 'leavesIndex'])->name('admin.leaves.index');
+    Route::get('/leaves', [LeaveRequestController::class, 'allHistory'])->name('admin.leaves.index');
     Route::put('/leaves/{id}', [AdminController::class, 'leavesUpdate'])->name('admin.leaves.update');
 
     // Route Lembur
-    Route::get('/overtime', [AdminController::class, 'overtimeIndex'])->name('overtime.index');
+    Route::get('/overtime', [OvertimeSubmissionController::class, 'indexAdmin'])->name('overtime.index');
     Route::put('/overtime/{id}', [AdminController::class, 'overtimeUpdate'])->name('overtime.update');
 
     // Di dalam group middleware auth & prefix admin

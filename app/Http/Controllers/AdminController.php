@@ -244,6 +244,30 @@ class AdminController extends Controller
         return redirect()->back()->with('success', 'Jabatan berhasil ditambahkan');
     }
 
+    public function positionUpdate(Request $request, $id)
+    {
+        // 1. Validasi Input (Sama seperti create)
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'base_salary' => 'required|numeric|min:0',
+            'overtime_rate' => 'required|numeric|min:0',
+            'daily_transport_allowance' => 'required|numeric|min:0',
+            'late_fee_per_incident' => 'required|numeric|min:0',
+        ]);
+
+        // 2. Cari data dan update
+        $position = Position::findOrFail($id);
+
+        $position->update([
+            'name' => $request->name,
+            'base_salary' => $request->base_salary,
+            'overtime_rate' => $request->overtime_rate,
+            'daily_transport_allowance' => $request->daily_transport_allowance,
+            'late_fee_per_incident' => $request->late_fee_per_incident,
+        ]);
+
+        return redirect()->back()->with('success', 'Jabatan berhasil diperbarui');
+    }
     public function positionDestroy($id)
     {
         Position::findOrFail($id)->delete();

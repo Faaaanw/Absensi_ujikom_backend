@@ -15,7 +15,9 @@ class OvertimeSubmissionController extends Controller
     /**
      * POST /api/overtime
      * Karyawan mengajukan lembur
+     * 
      */
+
     public function store(Request $request)
     {
         $request->validate([
@@ -80,24 +82,28 @@ class OvertimeSubmissionController extends Controller
      */
     public function indexAdmin(Request $request)
     {
-        // Cek apakah user adalah admin
         if (Auth::user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
+            // Sesuaikan return ini jika Anda menggunakan Blade, ganti json ke view()
+            return redirect()->back()->with('error', 'Unauthorized');
         }
 
-        $query = OvertimeSubmission::with('user.profile'); // Load data karyawan
+        $query = OvertimeSubmission::with('user.profile');
 
-        // Filter by status (opsional) ?status=pending
-        if ($request->has('status')) {
+        // --- LOGIKA FILTER TANGGAL ---
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            $query->whereBetween('date', [$request->start_date, $request->end_date]);
+        }
+        // -----------------------------
+
+        // Filter status (jika ada)
+        if ($request->has('status') && $request->status != '') {
             $query->where('status', $request->status);
         }
 
-        $submissions = $query->orderBy('date', 'desc')->get();
+        $overtimes = $query->orderBy('date', 'desc')->get();
 
-        return response()->json([
-            'success' => true,
-            'data' => $submissions
-        ]);
+        // Pastikan return ke view, bukan JSON, agar Blade bisa membacanya
+        return view('admin.overtime.index', compact('overtimes'));
     }
 
     /**
