@@ -11,86 +11,131 @@ use Carbon\Carbon;
 class AutoMarkAlpha extends Command
 {
     protected $signature = 'attendance:mark-alpha-realtime';
-    protected $description = 'Cek realtime: Set Alpha jika telat > 2 jam dari jam masuk shift';
+    protected $description = 'Cek Absensi: Set Alpha untuk hari ini (jika telat) DAN hari-hari sebelumnya (jika server sempat mati)';
 
     public function handle()
     {
-        $now = Carbon::now();
-        $today = Carbon::today();
+        $this->info("Memulai proses pengecekan Alpha...");
 
-        // 1. Skip jika hari libur (Weekend)
-        if ($now->isWeekend()) {
-            return;
-        }
-
-        // 2. Ambil user aktif beserta Shift-nya
-        // Pastikan relasi di model User sudah benar: user -> profile -> shift
+        // Ambil user aktif beserta Shift-nya
         $users = User::with('profile.shift')
-            ->where('role', '!=', 'admin') // Kecualikan admin
+            ->where('role', '!=', 'admin')
             ->get();
 
-        $count = 0;
+        $countRealtime = 0;
+        $countBackfill = 0;
+        $today = Carbon::today(); // Hari ini jam 00:00:00
+        $now = Carbon::now();     // Waktu sekarang lengkap jam menit
 
         foreach ($users as $user) {
-            // Validasi data shift
+            // Validasi data profil & shift
             if (!$user->profile || !$user->profile->shift) {
                 continue;
             }
 
             $shift = $user->profile->shift;
 
-            // 3. Tentukan Batas Alpha User Ini
-            // Contoh: Shift 09:00, maka batasnya 11:00
-            $jamMasuk = Carbon::parse($shift->start_time); // Misal 09:00:00
+            // ==========================================================
+            // BAGIAN 1: BACKFILL (Cek Kemarin & Hari Sebelumnya)
+            // ==========================================================
+            // Kita cek 3 hari ke belakang untuk berjaga-jaga jika server mati saat weekend/libur panjang
+            // Loop dari 1 hari yang lalu sampai 3 hari yang lalu
 
-            // Set tanggal jam masuk ke hari ini agar bisa dibandingkan dengan $now
-            $jamMasuk->setDate($today->year, $today->month, $today->day);
+            for ($i = 1; $i <= 3; $i++) {
+                $checkDate = Carbon::today()->subDays($i);
 
-            $batasAlpha = $jamMasuk->copy()->addHours(2); // Jam 11:00:00
-
-            // 4. LOGIKA UTAMA
-            // Hanya proses jika:
-            // A. Waktu sekarang SUDAH MELEWATI batas alpha (Sekarang > 11:00)
-            if ($now->greaterThan($batasAlpha)) {
-
-                // B. Cek apakah sudah ada data absensi hari ini?
-                $attendanceExists = Attendance::where('user_id', $user->id)
-                    ->whereDate('date', $today)
-                    ->exists();
-
-                // Jika SUDAH ada record (baik itu hadir, terlambat, izin, atau alpha yg dibuat sebelumnya), SKIP.
-                if ($attendanceExists) {
+                // 1.A. Skip jika hari tersebut adalah Weekend (Sabtu/Minggu)
+                if ($checkDate->isWeekend()) {
                     continue;
                 }
 
-                // C. Cek apakah dia sedang CUTI Approved?
-                $isOnLeave = LeaveRequest::where('user_id', $user->id)
-                    ->where('status', 'approved')
-                    ->whereDate('start_date', '<=', $today)
-                    ->whereDate('end_date', '>=', $today)
+                // 1.B. Cek apakah SUDAH ADA data absensi di tanggal tersebut?
+                $attendancePastExists = Attendance::where('user_id', $user->id)
+                    ->whereDate('date', $checkDate)
                     ->exists();
 
-                if ($isOnLeave) {
-                    continue; // Sedang cuti, jangan di-Alpha
+                // Jika sudah ada record (hadir/sakit/alpha/izin), skip.
+                if ($attendancePastExists) {
+                    continue;
                 }
 
-                // D. EKSEKUSI: Buat status Alpha
-                Attendance::create([
-                    'user_id' => $user->id,
-                    'shift_id' => $shift->id,
-                    'date' => $today,
-                    'status' => 'alpha', // Otomatis Alpha
-                    'clock_in' => null,
-                    'clock_out' => null,
-                ]);
+                // 1.C. Cek apakah saat itu sedang CUTI Approved?
+                $isOnLeavePast = $this->checkLeaveStatus($user->id, $checkDate);
+                if ($isOnLeavePast) {
+                    continue;
+                }
 
-                $count++;
-                $this->info("User {$user->name} terlambat > 2 jam. Status set ke Alpha.");
+                // 1.D. EKSEKUSI: Buat status Alpha untuk MASA LALU
+                $this->createAlpha($user->id, $shift->id, $checkDate);
+                $countBackfill++;
+                $this->info("BACKFILL: User {$user->name} tanggal {$checkDate->format('Y-m-d')} ditandai Alpha.");
+            }
+
+            // ==========================================================
+            // BAGIAN 2: REALTIME (Cek Hari Ini)
+            // ==========================================================
+
+            // 2.A. Skip jika hari ini Weekend
+            if ($today->isWeekend()) {
+                continue;
+            }
+
+            // 2.B. Tentukan Batas Alpha Hari Ini
+            $jamMasuk = Carbon::parse($shift->start_time);
+            $jamMasuk->setDate($today->year, $today->month, $today->day);
+            $batasAlpha = $jamMasuk->copy()->addHours(2);
+
+            // 2.C. Cek Waktu: Hanya proses jika sekarang > batas alpha
+            if ($now->greaterThan($batasAlpha)) {
+
+                // Cek absensi hari ini
+                $attendanceTodayExists = Attendance::where('user_id', $user->id)
+                    ->whereDate('date', $today)
+                    ->exists();
+
+                if ($attendanceTodayExists) {
+                    continue;
+                }
+
+                // Cek Cuti hari ini
+                if ($this->checkLeaveStatus($user->id, $today)) {
+                    continue;
+                }
+
+                // EKSEKUSI: Buat status Alpha untuk HARI INI
+                $this->createAlpha($user->id, $shift->id, $today);
+                $countRealtime++;
+                $this->info("REALTIME: User {$user->name} terlambat > 2 jam hari ini. Status set ke Alpha.");
             }
         }
 
-        if ($count > 0) {
-            $this->info("Proses selesai. {$count} karyawan ditandai Alpha.");
-        }
+        $this->info("Selesai. Backfill: {$countBackfill}, Realtime: {$countRealtime}.");
+    }
+
+    /**
+     * Helper untuk cek Cuti
+     */
+    private function checkLeaveStatus($userId, $date)
+    {
+        return LeaveRequest::where('user_id', $userId)
+            ->where('status', 'approved')
+            ->whereDate('start_date', '<=', $date)
+            ->whereDate('end_date', '>=', $date)
+            ->exists();
+    }
+
+    /**
+     * Helper untuk Create Alpha
+     */
+    private function createAlpha($userId, $shiftId, $date)
+    {
+        Attendance::create([
+            'user_id' => $userId,
+            'shift_id' => $shiftId,
+            'date' => $date, // Tanggal sesuai parameter (bisa hari ini atau kemarin)
+            'status' => 'alpha',
+            'clock_in' => null,
+            'clock_out' => null,
+        ]);
     }
 }

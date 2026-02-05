@@ -71,25 +71,25 @@ class LeaveRequestController extends Controller
      * Update Status Izin (Sisi Admin - Dashboard)
      */
     public function allHistory(Request $request)
-{
-    if (Auth::user()->role !== 'admin') {
-        return redirect()->back();
+    {
+        if (Auth::user()->role !== 'admin') {
+            return redirect()->back();
+        }
+
+        $query = LeaveRequest::with('user.profile');
+
+        // --- LOGIKA FILTER TANGGAL ---
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            // Memfilter data dimana tanggal mulai izin berada dalam rentang yang dipilih
+            $query->whereBetween('start_date', [$request->start_date, $request->end_date]);
+        }
+        // -----------------------------
+
+        $leaves = $query->orderBy('created_at', 'desc')->get();
+
+        // Pastikan return ke view
+        return view('admin.leaves.index', compact('leaves'));
     }
-
-    $query = LeaveRequest::with('user.profile');
-
-    // --- LOGIKA FILTER TANGGAL ---
-    if ($request->filled('start_date') && $request->filled('end_date')) {
-        // Memfilter data dimana tanggal mulai izin berada dalam rentang yang dipilih
-        $query->whereBetween('start_date', [$request->start_date, $request->end_date]);
-    }
-    // -----------------------------
-
-    $leaves = $query->orderBy('created_at', 'desc')->get();
-
-    // Pastikan return ke view
-    return view('admin.leaves.index', compact('leaves'));
-}
 
     public function approve(Request $request, $id)
     {
@@ -119,20 +119,16 @@ class LeaveRequestController extends Controller
                     ->first();
 
                 if ($attendance) {
-                    // Jika sudah ada (misal dia masuk setengah hari lalu izin),
-                    // Kita update statusnya saja jika belum clock_in, 
-                    // TAPI jika sudah clock_in, biarkan statusnya mengikuti logika kehadiran atau ubah manual.
-
-                    // Opsi aman: Hanya update jika belum ada jam masuk
                     if (!$attendance->clock_in) {
-                        $attendance->update(['status' => 'izin']);
+                        // PERBAIKAN: Gunakan $leave->type agar statusnya sesuai (sakit/izin/cuti)
+                        $attendance->update(['status' => $leave->type]);
                     }
                 } else {
-                    // Jika belum ada record sama sekali, buat baru sebagai izin
                     Attendance::create([
                         'user_id' => $leave->user_id,
                         'date' => $date->format('Y-m-d'),
-                        'status' => 'izin',
+                        // PERBAIKAN: Gunakan $leave->type
+                        'status' => $leave->type,
                         'clock_in' => null,
                         'clock_out' => null,
                     ]);
@@ -146,5 +142,5 @@ class LeaveRequestController extends Controller
             'data' => $leave
         ]);
     }
-    
+
 }

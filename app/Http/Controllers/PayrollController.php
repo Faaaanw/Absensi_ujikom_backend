@@ -4,16 +4,15 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\OvertimeSubmission;
-use App\Models\Payroll;
 use App\Models\Bonus;
 use App\Models\Payrolls;
 use App\Models\User;
+use App\Models\Attendance; // Jangan lupa import ini
+use Carbon\Carbon; // Import Carbon
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class PayrollController extends Controller
 {
-
     public function generatePayroll(Request $request)
     {
         $request->validate([
@@ -23,21 +22,89 @@ class PayrollController extends Controller
         ]);
 
         // 1. Ambil Data Karyawan & Jabatan
-        $user = User::with('profile.position')->findOrFail($request->user_id);
+        $user = User::with(['profile.position', 'profile.shift'])->findOrFail($request->user_id);
         $position = $user->profile->position;
 
         if (!$position) {
             return response()->json(['message' => 'Posisi/Jabatan belum diatur.'], 400);
         }
 
-        // 2. Hitung Lembur (Overtime) - Hanya yang Approved
-        $totalOvertimeHours = OvertimeSubmission::where('user_id', $user->id)
+        // =========================================================================
+        // 2. LOGIKA BARU: Hitung Lembur Valid (Cross-Check Absensi)
+        // =========================================================================
+
+        // Ambil semua pengajuan lembur yang APPROVED di bulan ini
+        $approvedOvertimes = OvertimeSubmission::where('user_id', $user->id)
             ->whereMonth('date', $request->month)
             ->whereYear('date', $request->year)
             ->where('status', 'approved')
-            ->sum('duration');
+            ->get();
 
-        $overtimePay = $totalOvertimeHours * $position->overtime_rate;
+        $validOvertimeHours = 0;
+        $rejectedOvertimeCount = 0; // Untuk tracking berapa yang dibatalkan sistem
+
+        foreach ($approvedOvertimes as $ot) {
+            // A. Cari Data Absensi pada tanggal lembur tersebut
+            $attendance = Attendance::with('shift') // Load shift dari history absen
+                ->where('user_id', $user->id)
+                ->whereDate('date', $ot->date)
+                ->first();
+
+            // B. VALIDASI 1: Apakah karyawan masuk (Scan Absen)?
+            // Jika $attendance null, berarti Alpha.
+            if (!$attendance) {
+                // SKIP: Tidak dihitung karena Alpha/Tidak Scan
+                $rejectedOvertimeCount++;
+                continue;
+            }
+
+            // C. VALIDASI 2: Apakah statusnya Hadir/Terlambat?
+            // Jika statusnya 'sakit', 'izin', atau 'cuti', lembur tidak valid.
+            if (!in_array($attendance->status, ['hadir', 'terlambat'])) {
+                // SKIP: Tidak dihitung karena status Izin/Sakit/Cuti
+                $rejectedOvertimeCount++;
+                continue;
+            }
+
+            // D. VALIDASI 3: Cek Jam Pulang (Apakah pulang tepat waktu?)
+            if ($attendance->clock_out) {
+                // Tentukan jam selesai shift. 
+                // Prioritas: Ambil dari history attendance (shift_id), jika tidak ada ambil dari profile user saat ini
+                $shiftEndTimeStr = $attendance->shift ? $attendance->shift->end_time : $user->profile->shift->end_time;
+
+                // Buat objek Carbon untuk perbandingan waktu
+                // Gabungkan tanggal lembur dengan jam shift
+                $shiftEndTime = Carbon::parse($ot->date . ' ' . $shiftEndTimeStr);
+                $actualClockOut = Carbon::parse($ot->date . ' ' . $attendance->clock_out);
+
+                // Tambahkan toleransi sedikit (misal: 15 menit setelah jam pulang masih dianggap "tepat waktu" alias tidak lembur)
+                // Jika jam pulang aktual LEBIH KECIL dari (Jam Shift + 15 menit)
+                // Contoh: Shift pulang 17:00. Dia pulang 17:10. Maka Lembur HANGUS.
+                // Dia harus pulang misal jam 18:00 agar lemburnya 1 jam valid.
+
+                // Logika: Jika Actual <= Shift End, berarti dia tidak melebihkan waktu.
+                if ($actualClockOut->lte($shiftEndTime->addMinutes(15))) { // Toleransi 15 menit
+                    // SKIP: Pulang tenggo (on time), padahal mengajukan lembur
+                    $rejectedOvertimeCount++;
+                    continue;
+                }
+            } else {
+                // Kasus: Lupa Absen Pulang (Clock Out kosong)
+                // Kebijakan: Jika tidak absen pulang, lembur tidak bisa diverifikasi -> Tidak Valid
+                $rejectedOvertimeCount++;
+                continue;
+            }
+
+            // Jika lolos semua validasi di atas, tambahkan durasi ke total
+            $validOvertimeHours += $ot->duration;
+        }
+
+        // Hitung Uang Lembur Berdasarkan Jam Valid
+        $overtimePay = $validOvertimeHours * $position->overtime_rate;
+
+        // =========================================================================
+        // AKHIR LOGIKA BARU
+        // =========================================================================
 
         // 3. Hitung Bonus
         $bonusPay = Bonus::where('user_id', $user->id)
@@ -46,36 +113,22 @@ class PayrollController extends Controller
             ->sum('amount');
 
         // 4. Hitung Kehadiran (Allowance) & Keterlambatan (Deduction)
-        // Ambil semua data absensi bulan ini
-        $attendances = \App\Models\Attendance::where('user_id', $user->id)
+        $attendances = Attendance::where('user_id', $user->id)
             ->whereMonth('date', $request->month)
             ->whereYear('date', $request->year)
             ->get();
 
-        // Hitung jumlah hari masuk (Hadir & Terlambat dihitung masuk)
         $totalPresentDays = $attendances->whereIn('status', ['hadir', 'terlambat'])->count();
-
-        // Hitung jumlah kejadian terlambat
         $totalLateIncidents = $attendances->where('status', 'terlambat')->count();
 
-        // KALKULASI TUNJANGAN & POTONGAN
-        // Tunjangan Transport = Hari Masuk * Tarif Transport Jabatan
         $transportAllowance = $totalPresentDays * $position->daily_transport_allowance;
-
-        // Potongan = Jumlah Terlambat * Tarif Denda Jabatan
         $totalDeductions = $totalLateIncidents * $position->late_fee_per_incident;
 
-        // 5. Hitung Gaji Bersih (Net Salary)
+        // 5. Hitung Gaji Bersih
         $basicSalary = $position->base_salary;
-
-        // Rumus: Gaji Pokok + Lembur + Bonus + Transport - Potongan
         $netSalary = ($basicSalary + $overtimePay + $bonusPay + $transportAllowance) - $totalDeductions;
 
         // 6. Simpan ke Database
-        // Catatan: Jika tabel payrolls belum punya kolom 'allowances', 
-        // kamu bisa gabungkan transport ke basic_salary atau buat migration baru.
-        // Di sini saya asumsikan basic_salary tetap murni gaji pokok.
-
         $payroll = Payrolls::updateOrCreate(
             [
                 'user_id' => $user->id,
@@ -84,11 +137,11 @@ class PayrollController extends Controller
             ],
             [
                 'basic_salary' => $basicSalary,
-                'overtime_pay' => $overtimePay,
+                'overtime_pay' => $overtimePay, // Nilai hasil validasi ketat
                 'bonus_pay' => $bonusPay,
                 'deductions' => $totalDeductions,
                 'net_salary' => $netSalary,
-                'total_attendance' => $totalPresentDays // Menyimpan total hari hadir
+                'total_attendance' => $totalPresentDays
             ]
         );
 
@@ -99,8 +152,10 @@ class PayrollController extends Controller
                 'payroll' => $payroll,
                 'details' => [
                     'hari_kerja' => $totalPresentDays,
+                    'lembur_diajukan_jam' => $approvedOvertimes->sum('duration'),
+                    'lembur_valid_jam' => $validOvertimeHours, // Info jam valid
+                    'lembur_ditolak_sistem' => $rejectedOvertimeCount . ' pengajuan', // Info berapa yg batal
                     'tunjangan_transport' => $transportAllowance,
-                    'jumlah_terlambat' => $totalLateIncidents,
                     'total_denda' => $totalDeductions
                 ]
             ]
